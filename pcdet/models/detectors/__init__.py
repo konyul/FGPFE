@@ -15,7 +15,7 @@ from .pillarnet import PillarNet
 from .voxelnext import VoxelNeXt
 from .transfusion import TransFusion
 from .bevfusion import BevFusion
-
+from .fgpfe import FGPFE
 __all__ = {
     'Detector3DTemplate': Detector3DTemplate,
     'SECONDNet': SECONDNet,
@@ -35,6 +35,7 @@ __all__ = {
     'VoxelNeXt': VoxelNeXt,
     'TransFusion': TransFusion,
     'BevFusion': BevFusion,
+    'FGPFE': FGPFE
 }
 
 

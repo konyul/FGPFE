@@ -5,8 +5,8 @@ import torch.nn.functional as F
 
 from . import box_utils
 from pcdet.ops.iou3d_nms import iou3d_nms_utils
-
-
+from pcdet.models.model_utils.centernet_utils import bbox3d_overlaps_diou, bbox3d_overlaps_giou
+from pcdet.ops.iou3d_nms.iou3d_nms_utils import boxes_aligned_iou3d_gpu
 class SigmoidFocalClassificationLoss(nn.Module):
     """
     Sigmoid focal cross entropy loss.
@@ -647,3 +647,55 @@ def calculate_iou_reg_loss_centerhead(batch_box_preds, mask, ind, gt_boxes):
 
     loss = (1.0 - iou).sum() / torch.clamp(mask.sum(), min=1e-4)
     return loss
+
+class IouLoss(nn.Module):
+  '''IouLoss loss for an output tensor
+    Arguments:
+      output (batch x dim x h x w)
+      mask (batch x max_objects)
+      ind (batch x max_objects)
+      target (batch x max_objects x dim)
+  '''
+
+  def __init__(self):
+    super(IouLoss, self).__init__()
+
+  def forward(self, iou_pred, mask, ind, box_pred, box_gt):
+    if mask.sum() == 0:
+      return iou_pred.new_zeros((1))
+    mask = mask.bool()
+    pred = _transpose_and_gather_feat(iou_pred, ind)[mask]
+    pred_box = _transpose_and_gather_feat(box_pred, ind)
+    target = boxes_aligned_iou3d_gpu(pred_box[mask], box_gt[mask])
+    target = 2 * target - 1
+    loss = F.l1_loss(pred, target, reduction='sum')
+    loss = loss / (mask.sum() + 1e-4)
+    return loss
+
+
+class IouRegLoss(nn.Module):
+    '''Distance IoU loss for output boxes
+    Arguments:
+        output (batch x dim x h x w)
+        mask (batch x max_objects)
+        ind (batch x max_objects)
+        target (batch x max_objects x dim)
+    '''
+
+    def __init__(self, type="IoU"):
+        super(IouRegLoss, self).__init__()
+        if type == "DIoU":
+            self.bbox3d_iou_func = bbox3d_overlaps_diou
+        elif type == 'GIoU':
+            self.bbox3d_iou_func = bbox3d_overlaps_giou
+        else:
+            raise NotImplementedError
+
+    def forward(self, box_pred, mask, ind, box_gt):
+        if mask.sum() == 0:
+            return box_pred.new_zeros((1))
+        mask = mask.bool()
+        pred_box = _transpose_and_gather_feat(box_pred, ind)
+        iou = self.bbox3d_iou_func(pred_box[mask], box_gt[mask])
+        loss = (1. - iou).sum() / (mask.sum() + 1e-4)
+        return loss

@@ -4,7 +4,7 @@ import argparse
 import os
 from os import path as osp
 import torch
-from av2.utils.io import read_feather
+# from av2.utils.io import read_feather
 import numpy as np
 import multiprocessing as mp
 import pickle as pkl
