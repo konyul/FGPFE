@@ -298,6 +298,7 @@ class FineGrainedPFE(VFETemplate):
                     nn.BatchNorm1d(32, eps=1e-3, momentum=0.01),
                     nn.ReLU())
         self.senet = SENet(96, 8)
+        self.double_flip = model_cfg.get("DOUBLE_FLIP", False)
 
 
     def get_output_feature_dim(self):
@@ -348,6 +349,8 @@ class FineGrainedPFE(VFETemplate):
         return batch_dict
     
     def forward(self, batch_dict, **kwargs):
+        if self.double_flip:
+            batch_dict['batch_size'] = batch_dict['batch_size']*4
         points = batch_dict['points']  # (batch_idx, x, y, z, i, e)
         points_coords_3d = torch.floor((points[:, 1:4] - self.point_cloud_range[0:3]) / self.voxel_size).int()
         points_coords = points_coords_3d[:,:2]

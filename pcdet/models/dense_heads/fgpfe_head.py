@@ -103,6 +103,7 @@ class FGPFEHead(nn.Module):
             self.crit_iou_reg = IouRegLoss(self.with_iou_reg)
         self.build_losses()
         self.bn_folding = bn_folding
+        self.double_flip = self.model_cfg.get("DOUBLE_FLIP",False)
     def build_losses(self):
         self.add_module('hm_loss_func', loss_utils.FocalLossCenterNet())
         self.add_module('reg_loss_func', loss_utils.RegLossCenterNet())
@@ -319,6 +320,13 @@ class FGPFEHead(nn.Module):
             'pred_labels': [],
         } for k in range(batch_size)]
         for idx, pred_dict in enumerate(pred_dicts):
+            if self.double_flip:
+                for k in pred_dict.keys():
+                    _, C, H, W = pred_dict[k].shape
+                    pred_dict[k] = pred_dict[k].reshape(4, C, H, W)
+                    pred_dict[k][1] = torch.flip(pred_dict[k][1], dims=[1]) 
+                    pred_dict[k][2] = torch.flip(pred_dict[k][2], dims=[2])
+                    pred_dict[k][3] = torch.flip(pred_dict[k][3], dims=[1, 2])
             batch_hm = pred_dict['hm'].sigmoid()
             batch_center = pred_dict['center']
             batch_center_z = pred_dict['center_z']
@@ -331,6 +339,43 @@ class FGPFEHead(nn.Module):
             batch_rot_cos = pred_dict['rot'][:, 0].unsqueeze(dim=1)
             batch_rot_sin = pred_dict['rot'][:, 1].unsqueeze(dim=1)
             batch_vel = pred_dict['vel'] if 'vel' in self.separate_head_cfg.HEAD_ORDER else None
+            if self.double_flip:
+                batch_hm = batch_hm.mean(dim=0).unsqueeze(0)
+                batch_iou = batch_iou.mean(dim=0).unsqueeze(0)
+                batch_center_z = batch_center_z.mean(dim=0).unsqueeze(0)
+                batch_dim = batch_dim.mean(dim=0).unsqueeze(0)
+                # y = -y reg_y = 1-reg_y
+                batch_center[1, 1, ...] = 1 - batch_center[1, 1, ...]
+                batch_center[2, 0, ...] = 1 - batch_center[2, 0, ...]
+
+                batch_center[3, 0, ...] = 1 - batch_center[3, 0, ...]
+                batch_center[3, 1, ...] = 1 - batch_center[3, 1, ...]
+                batch_center = batch_center.mean(dim=0).unsqueeze(0)
+
+                # first yflip 
+                # y = -y theta = pi -theta
+                # sin(pi-theta) = sin(theta) cos(pi-theta) = -cos(theta)
+                # batch_rot_sin[:, 1] the same
+                batch_rot_cos[2] *= -1  # batch_rot_cos[1] *= -1 # batch_rot_cos[2] *= -1
+
+                # then xflip x = -x theta = 2pi - theta
+                # sin(2pi - theta) = -sin(theta) cos(2pi - theta) = cos(theta)
+                # batch_rot_sin[:, 2] the same
+                batch_rot_sin[1] *= -1 # batch_rot_sin[2] *= -1 # batch_rot_sin[1] *= -1
+
+                # double flip 
+                batch_rot_sin[3] *= -1
+                batch_rot_cos[3] *= -1
+
+                batch_rot_cos = batch_rot_cos.mean(dim=0).unsqueeze(0)
+                batch_rot_sin = batch_rot_sin.mean(dim=0).unsqueeze(0)
+                # flip vy
+                batch_vel[1, 1, ...] *= -1
+                # flip vx
+                batch_vel[2, 0, ...] *= -1
+
+                batch_vel[3] *= -1
+                batch_vel = batch_vel.mean(dim=0).unsqueeze(0)
 
             final_pred_dicts = centernet_utils.decode_bbox_from_heatmap(
                 heatmap=batch_hm, rot_cos=batch_rot_cos, rot_sin=batch_rot_sin,
@@ -404,6 +449,8 @@ class FGPFEHead(nn.Module):
         self.forward_ret_dict['pred_dicts'] = pred_dicts
 
         if not self.training or self.predict_boxes_when_training:
+            if self.double_flip:
+                data_dict['batch_size'] = data_dict['batch_size']//4
             pred_dicts = self.generate_predicted_boxes(
                 data_dict['batch_size'], pred_dicts
             )

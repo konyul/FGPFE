@@ -156,23 +156,11 @@ class DataProcessor(object):
             voxels = voxels[..., 3:]  # remove xyz in voxels(N, 3)
 
         if config.get('DOUBLE_FLIP', False):
-            voxels_list, voxel_coords_list, voxel_num_points_list = [voxels], [coordinates], [num_points]
             points_yflip, points_xflip, points_xyflip = self.double_flip(points)
-            points_list = [points_yflip, points_xflip, points_xyflip]
-            keys = ['yflip', 'xflip', 'xyflip']
-            for i, key in enumerate(keys):
-                voxel_output = self.voxel_generator.generate(points_list[i])
-                voxels, coordinates, num_points = voxel_output
-
-                if not data_dict['use_lead_xyz']:
-                    voxels = voxels[..., 3:]
-                voxels_list.append(voxels)
-                voxel_coords_list.append(coordinates)
-                voxel_num_points_list.append(num_points)
-
-            data_dict['voxels'] = voxels_list
-            data_dict['voxel_coords'] = voxel_coords_list
-            data_dict['voxel_num_points'] = voxel_num_points_list
+            data_dict['points'] = [points, points_yflip, points_xflip, points_xyflip]
+            data_dict['voxels'] = voxels
+            data_dict['voxel_coords'] = coordinates
+            data_dict['voxel_num_points'] = num_points
         else:
             data_dict['voxels'] = voxels
             data_dict['voxel_coords'] = coordinates
