@@ -35,7 +35,7 @@ This is the official implementation of ***FG-PFE***, a new pillar encoding archi
 
 ## Acknowledgement
 
-- This work is built upon the [**CenterPoint**](https://github.com/tianweiy/CenterPoint). Please refer to the official github repositories, CenterPoint for more information.
+- This work is built upon the [**OpenPCDet**](https://github.com/open-mmlab/OpenPCDet). Please refer to the official github repositories, OpenPCDet for more information.
 - This README follows the style of **[3D Dual-Fusion](https://github.com/rasd3/3D-Dual-Fusion)**.
 
 ## License
@@ -45,5 +45,3 @@ This project is released under the Apache 2.0 license.
 ## Related Repos
 
 1. spconv
-2. Deformable Conv
-3. Deformable DETR
